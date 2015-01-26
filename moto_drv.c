@@ -46,7 +46,7 @@ struct moto_step_drv {
     unsigned char portval;
     int delay;/* ms */
 };
-#define ONE_STEP_PULSE (8)
+#define ONE_STEP_PULSE (4)
 
 #if (8 == ONE_STEP_PULSE)
 struct moto_step_drv h_ccwtab[ONE_STEP_PULSE] = {
@@ -163,7 +163,6 @@ static void moto_action_l(unsigned long arg)
     struct moto_drv_action *pmda = (struct moto_drv_action *)arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     MOTO_DRV_LOG("%s GET_L_POSTION=%#x\n",__func__,regval);
-#if 1
     if(regval)
     {
         /* go on */
@@ -172,20 +171,6 @@ static void moto_action_l(unsigned long arg)
 		HW_REG(IO_ADDRESS(GPIO_9_BASE + h_ccwtab[i].regoff)) = h_ccwtab[i].portval;
 		msleep(h_ccwtab[i].delay);
 	}
-	#if 0
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_ccwtab[0].regoff)) = h_ccwtab[0].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_ccwtab[1].regoff)) = h_ccwtab[1].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_ccwtab[2].regoff)) = h_ccwtab[2].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_ccwtab[3].regoff)) = h_ccwtab[3].portval;
-	/* delay */
-	msleep(1);
-	#endif
 	pmda->rsp = MOTO_RSP_DONE;
     }
     else
@@ -194,18 +179,6 @@ static void moto_action_l(unsigned long arg)
        MOTO_DRV_LOG("%s max step stop\n",__func__);
 	pmda->rsp = MOTO_RSP_MAX;
     }
-#endif
-#if 0
-    i = 0;
-    while(regval)
-    {
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_ccwtab[i%ONE_STEP_PULSE].regoff)) = h_ccwtab[i%ONE_STEP_PULSE].portval;
-	/* delay */
-	msleep(1);
-	i++;
-    	regval = GET_L_POSTION;
-    }
-#endif
     MOTO_DRV_LOG("%s exit\n",__func__);
 }
 
@@ -216,7 +189,6 @@ static void moto_action_r(unsigned long arg)
     struct moto_drv_action *pmda = (struct moto_drv_action *)arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     MOTO_DRV_LOG("%s GET_R_POSTION=%#x\n",__func__,regval);
-#if 1
     if(regval)
     {
         /* go on */
@@ -225,20 +197,6 @@ static void moto_action_r(unsigned long arg)
 		HW_REG(IO_ADDRESS(GPIO_9_BASE + h_cwtab[i].regoff)) = h_cwtab[i].portval;
 		msleep(h_cwtab[i].delay);
 	}
-	#if 0
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_cwtab[0].regoff)) = h_cwtab[0].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_cwtab[1].regoff)) = h_cwtab[1].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_cwtab[2].regoff)) = h_cwtab[2].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + h_cwtab[3].regoff)) = h_cwtab[3].portval;
-	/* delay */
-	msleep(1);
-	#endif
 	pmda->rsp = MOTO_RSP_DONE;
     }
     else
@@ -247,7 +205,6 @@ static void moto_action_r(unsigned long arg)
        MOTO_DRV_LOG("%s max step stop\n",__func__);
 	pmda->rsp = MOTO_RSP_MAX;
     }
-#endif
     MOTO_DRV_LOG("%s exit\n",__func__);
 }
 static void moto_action_u(unsigned long arg)
@@ -257,7 +214,6 @@ static void moto_action_u(unsigned long arg)
     struct moto_drv_action *pmda = (struct moto_drv_action *)arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     MOTO_DRV_LOG("%s GET_U_POSTION=%#x\n",__func__,regval);
-#if 1
     if(regval)
     {
         /* go on */
@@ -266,20 +222,6 @@ static void moto_action_u(unsigned long arg)
 		HW_REG(IO_ADDRESS(GPIO_9_BASE + v_ccwtab[i].regoff)) = v_ccwtab[i].portval;
 		msleep(v_ccwtab[i].delay);
 	}
-	#if 0
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + v_ccwtab[0].regoff)) = v_ccwtab[0].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + v_ccwtab[1].regoff)) = v_ccwtab[1].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + v_ccwtab[2].regoff)) = v_ccwtab[2].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + v_ccwtab[3].regoff)) = v_ccwtab[3].portval;
-	/* delay */
-	msleep(1);
-	#endif
 	pmda->rsp = MOTO_RSP_DONE;
     }
     else
@@ -288,7 +230,6 @@ static void moto_action_u(unsigned long arg)
        MOTO_DRV_LOG("%s max step stop\n",__func__);
 	pmda->rsp = MOTO_RSP_MAX;
     }
-#endif
     MOTO_DRV_LOG("%s exit\n",__func__);
 }
 static void moto_action_d(unsigned long arg)
@@ -298,7 +239,6 @@ static void moto_action_d(unsigned long arg)
     struct moto_drv_action *pmda = (struct moto_drv_action *)arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     MOTO_DRV_LOG("%s GET_D_POSTION=%#x\n",__func__,regval);
-#if 1
     if(regval)
     {
         /* go on */
@@ -307,20 +247,6 @@ static void moto_action_d(unsigned long arg)
 		HW_REG(IO_ADDRESS(GPIO_9_BASE + v_cwtab[i].regoff)) = v_cwtab[i].portval;
 		msleep(v_cwtab[i].delay);
 	}
-	#if 0
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + v_cwtab[0].regoff)) = v_cwtab[0].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + v_cwtab[1].regoff)) = v_cwtab[1].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + v_cwtab[2].regoff)) = v_cwtab[2].portval;
-	/* delay */
-	msleep(1);
-	HW_REG(IO_ADDRESS(GPIO_9_BASE + v_cwtab[3].regoff)) = v_cwtab[3].portval;
-	/* delay */
-	msleep(1);
-	#endif
 	pmda->rsp = MOTO_RSP_DONE;
     }
     else
@@ -329,7 +255,6 @@ static void moto_action_d(unsigned long arg)
        MOTO_DRV_LOG("%s max step stop\n",__func__);
 	pmda->rsp = MOTO_RSP_MAX;
     }
-#endif
     MOTO_DRV_LOG("%s exit\n",__func__);
 }
 

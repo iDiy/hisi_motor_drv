@@ -14,19 +14,12 @@
 #define MOTO_LOG
 #endif
 
-#if defined(MOTO_DBG)
-#define DOIT_CHAR_L "a"
-#define DOIT_CHAR_R "s"
-#define DOIT_CHAR_U "d"
-#define DOIT_CHAR_D "f"
-#else
 #define DOIT_CHAR_L "l"
 #define DOIT_CHAR_R "r"
 #define DOIT_CHAR_U "u"
 #define DOIT_CHAR_D "d"
-#endif
 
-#define MAX_CHAR_LEN (8)
+#define MAX_CHAR_LEN (16)
 
 typedef void (*func_doit)(int , void *);
 
@@ -73,7 +66,7 @@ void moto_doit_l(int fhdl, void *arg)
     }
     mda.ind = MOTO_IND_L;
     mda.rsp = MOTO_RSP_INVALID;
-    for(i=0; i<64; i++)
+    for(i=0; i<648/8; i++)
     {
     ret = ioctl(fhdl, MOTO_DRV_DIR_CTL, &mda);
     if(0 == ret)
@@ -101,7 +94,7 @@ void moto_doit_r(int fhdl, void *arg)
     }
     mda.ind = MOTO_IND_R;
     mda.rsp = MOTO_RSP_INVALID;
-    for(i=0; i<64; i++)
+    for(i=0; i<648/8; i++)
     {
     ret = ioctl(fhdl, MOTO_DRV_DIR_CTL, &mda);
     if(0 == ret)
@@ -191,24 +184,15 @@ int main_dbg(int argc , char* argv[])
     ret = ioctl(fd, MOTO_DRV_NONE, &mda);
     while(1)
     {
-        char ch;
-    	//printf("%s pls input\n");
-	ch = getchar();
 	memset(carr,0,MAX_CHAR_LEN+1);
-
-        if(ch == 'q')
-        {
-            break;
-        }
-	else
+       scanf("%s", carr);
+	if(strcmp("q",carr) == 0) break;
+		
+	pma = (struct moto_action *)get_moto_doit(carr);
+	if((pma) && (pma->doitfunc))
 	{
-	    carr[0] = ch;
-	    pma = (struct moto_action *)get_moto_doit(carr);
-	    if((pma) && (pma->doitfunc))
-	    {
-		func_doit func = (func_doit)pma->doitfunc;
-		func(fd,NULL);
-	    }
+	    func_doit func = (func_doit)pma->doitfunc;
+	    func(fd,NULL);
 	}
     }
     close(fd);
@@ -216,18 +200,7 @@ int main_dbg(int argc , char* argv[])
 }
 int main_nodbg(int argc , char* argv[])
 {
-	int fd = -1;
-	unsigned int device_addr, reg_addr, reg_value, value;
-		
-	fd = open("/dev/moto_drv", 0);
-    if(fd<0)
-    {
-    	printf("Open moto_drv error!\n");
-    	return -1;
-    }
-    
-    return ioctl(fd, MOTO_DRV_DIR_CTL, &value);
-    
+    return 0;
 }
 
 int main(int argc , char* argv[])
