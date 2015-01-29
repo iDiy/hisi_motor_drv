@@ -2,11 +2,12 @@
 #ifndef _MOTO_DRV_H
 #define _MOTO_DRV_H
 
-#define MOTO_DBG
+//#define MOTO_DBG
+#define MOTO_DEVICE_NAME "moto_drv"
 
 enum {
     MOTO_DRV_NONE
-    ,MOTO_DRV_DIR_CTL
+    ,MOTO_DRV_SELF_TEST
 };
 
 enum {
@@ -25,17 +26,42 @@ enum {
     ,MOTO_RSP_INVALID = 0xFFFFFFFF
 };
 
+enum {
+	MOTO_HDEV = 0
+	,MOTO_VDEV = 1
+	,MOTO_NUM = 2
+};
+
+enum {
+	MOTO_CW = 0
+	,MOTO_CCW = 1
+	,MOTO_ORDER_NUM = 2
+};
+
+enum {
+	MOTO_SPD_LV1 = 0
+	,MOTO_SPD_LV2
+	,MOTO_SPD_LV3
+	,MOTO_SPD_LV4
+	,MOTO_SPD_LV5
+	,MOTO_SPD_LV_MAX
+};
+
+enum {
+	 MOTO_STATE_IDLE= 0
+	,MOTO_STATE_SELF_TEST
+	,MOTO_STATE_PRESETTING
+	,MOTO_STATE_TRIMMING
+	,MOTO_STATE_CRUISING
+	,MOTO_STATE_CONTROLLING
+};
+
 struct moto_drv_action {
 	unsigned int ind;
-	unsigned int rsp;
+	void *params;
 };
 
 typedef unsigned char		byte;
-
-unsigned char moto_drv_read(unsigned char devaddress, unsigned char address);
-void moto_drv_write(unsigned char devaddress, unsigned char address, unsigned char value);
-byte siiReadSegmentBlockEDID(byte SlaveAddr, byte Segment, byte Offset, byte *Buffer, byte Length);
-
 
 #endif
 
