@@ -7,7 +7,11 @@
 
 enum {
     MOTO_DRV_NONE
-    ,MOTO_DRV_SELF_TEST
+    ,MOTO_DRV_SELF_TEST=0x80
+    ,MOTO_DRV_HCCW
+    ,MOTO_DRV_HCW
+    ,MOTO_DRV_VCCW
+    ,MOTO_DRV_VCW
 };
 
 enum {
@@ -57,7 +61,6 @@ enum {
 };
 
 struct moto_drv_action {
-	unsigned int ind;
 	void *params;
 };
 

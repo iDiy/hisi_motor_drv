@@ -99,10 +99,12 @@ typedef struct
 typedef struct
 {
     moto_dev_param dev_param[MOTO_NUM];
+    int is_self_test;
     int cmd;
     int state;
     int pulse_num;/*-1 means infinite*/
     int pulse_cnt;/**/
+    unsigned long arg;
 }moto_dev_struct;
 
 struct moto_action_func {
@@ -120,6 +122,19 @@ void moto_action_stop(void);
 void self_test_start(void);
 void self_test_run(void);
 void self_test_stop(void);
+void hccw_start(void);
+void hccw_run(void);
+void hccw_stop(void);
+void hcw_start(void);
+void hcw_run(void);
+void hcw_stop(void);
+void vccw_start(void);
+void vccw_run(void);
+void vccw_stop(void);
+void vcw_start(void);
+void vcw_run(void);
+void vcw_stop(void);
+
 
 #if (8 == ONE_STEP_PULSE)
 struct moto_step_drv h_ccwtab[ONE_STEP_PULSE] = {
@@ -203,6 +218,10 @@ static moto_dev_struct moto_dev={0};
 
 struct moto_action_func moto_action_func_tab[] = {
     	{MOTO_DRV_SELF_TEST,self_test_start,self_test_run,self_test_stop}
+    	,{MOTO_DRV_HCCW,hccw_start,hccw_run,hccw_stop}
+    	,{MOTO_DRV_HCW,hcw_start,hcw_run,hcw_stop}
+    	,{MOTO_DRV_VCCW,vccw_start,vccw_run,vccw_stop}
+    	,{MOTO_DRV_VCW,vcw_start,vcw_run,vcw_stop}
 	,{0xFFFFFFFF,NULL,NULL,NULL}
 };
 #define MOTO_ACITON_FUNC_TAB_SIZE (sizeof(moto_action_func_tab)/sizeof(moto_action_func_tab[0]))
@@ -230,11 +249,6 @@ static irqreturn_t moto_interrupt(int irq, void *dev_id)
     MOTO_DRV_LOG("%s entry\n",__func__);
     /* moto action running */
     moto_action_run();
-    if((moto_dev.pulse_num > 0) && (moto_dev.pulse_num == moto_dev.pulse_cnt))
-    {
-        /* moto action stop */
-	moto_action_stop();
-    }
     HW_REG(TIMER3_INTCLR_REG) = 0x0;
     MOTO_DRV_LOG("%s exit\n",__func__);
     return IRQ_HANDLED;
@@ -272,10 +286,15 @@ void moto_action_start(unsigned int cmd, unsigned long arg)
 {
     struct moto_action_func *pmaf = get_moto_action_func(cmd);
     action_func func = NULL;
+    MOTO_DRV_LOG("%s entry\n",__func__);
     if(!pmaf) return;
+    MOTO_DRV_LOG("%s 11111\n",__func__);
     func = (action_func)pmaf->start_func;
     if(!func) return;
+    MOTO_DRV_LOG("%s 22222\n",__func__);
+    moto_dev.arg = arg;
     func();
+    MOTO_DRV_LOG("%s exit\n",__func__);
 }
 
 void moto_action_run(void)
@@ -300,6 +319,7 @@ void moto_action_stop(void)
 
 void self_test_start(void)
 {
+    moto_dev.is_self_test = 0;
     moto_dev.cmd = MOTO_DRV_SELF_TEST;
     moto_dev.state = MOTO_STATE_SELF_TEST;
     moto_dev.pulse_num = H_MAX_PLULSE;
@@ -307,12 +327,12 @@ void self_test_start(void)
 
     moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
     moto_dev.dev_param[MOTO_HDEV].curr_step = -1;
-    moto_dev.dev_param[MOTO_HDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_HDEV].default_step = H_MOTO_DEFAULT_STEP;
     moto_dev.dev_param[MOTO_HDEV].is_running = 1;
 
     moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
     moto_dev.dev_param[MOTO_VDEV].curr_step = -1;
-    moto_dev.dev_param[MOTO_VDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_VDEV].default_step = V_MOTO_DEFAULT_STEP;
     moto_dev.dev_param[MOTO_VDEV].is_running = 1;
 
     TIMER3_ENABLE;
@@ -321,6 +341,12 @@ void self_test_run(void)
 {
     struct moto_step_drv *pmsd;
 
+    if(moto_dev.pulse_num == moto_dev.pulse_cnt)
+    {
+        /* moto action stop */
+	moto_action_stop();
+	return;
+    }
     pmsd = moto_dev.dev_param[MOTO_HDEV].ordertab[MOTO_CCW];
     pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
     HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
@@ -345,40 +371,248 @@ void self_test_stop(void)
 {
     TIMER3_DISABLE;
 
+    moto_dev.is_self_test = 1;
     moto_dev.cmd = MOTO_DRV_NONE;
     moto_dev.state = MOTO_STATE_IDLE;
     moto_dev.pulse_num = -1;
     moto_dev.pulse_cnt = 0;
 
     //moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
-    //moto_dev.dev_param[MOTO_HDEV].curr_step = -1;
+    moto_dev.dev_param[MOTO_HDEV].curr_step = moto_dev.dev_param[MOTO_HDEV].default_step;
     //moto_dev.dev_param[MOTO_HDEV].default_step = -1;
     moto_dev.dev_param[MOTO_HDEV].is_running = 0;
 
     //moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
-    //moto_dev.dev_param[MOTO_VDEV].curr_step = -1;
+    moto_dev.dev_param[MOTO_VDEV].curr_step = moto_dev.dev_param[MOTO_VDEV].default_step;
     //moto_dev.dev_param[MOTO_VDEV].default_step = -1;
     moto_dev.dev_param[MOTO_VDEV].is_running = 0;
+}
+
+void hccw_start(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
+    moto_dev.cmd = MOTO_DRV_HCCW;
+    moto_dev.state = MOTO_STATE_TRIMMING;
+    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
+    moto_dev.pulse_cnt = 0;
+
+    moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = H_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_HDEV].is_running = 1;
+
+    TIMER3_ENABLE;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void hccw_run(void)
+{
+    struct moto_step_drv *pmsd;
+
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    if(moto_dev.pulse_num == moto_dev.pulse_cnt)
+    {
+        /* moto action stop */
+	moto_action_stop();
+	return;
+    }
+    pmsd = moto_dev.dev_param[MOTO_HDEV].ordertab[MOTO_CCW];
+    pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+    HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+
+    moto_dev.pulse_cnt++;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void hccw_stop(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    TIMER3_DISABLE;
+
+    moto_dev.cmd = MOTO_DRV_NONE;
+    moto_dev.state = MOTO_STATE_IDLE;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    //moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = moto_dev.dev_param[MOTO_HDEV].default_step;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_HDEV].is_running = 0;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void hcw_start(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
+    moto_dev.cmd = MOTO_DRV_HCW;
+    moto_dev.state = MOTO_STATE_TRIMMING;
+    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
+    moto_dev.pulse_cnt = 0;
+
+    moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = H_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_HDEV].is_running = 1;
+
+    TIMER3_ENABLE;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void hcw_run(void)
+{
+    struct moto_step_drv *pmsd;
+
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    if(moto_dev.pulse_num == moto_dev.pulse_cnt)
+    {
+        /* moto action stop */
+	moto_action_stop();
+	return;
+    }
+    pmsd = moto_dev.dev_param[MOTO_HDEV].ordertab[MOTO_CW];
+    pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+    HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+
+    moto_dev.pulse_cnt++;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void hcw_stop(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    TIMER3_DISABLE;
+
+    moto_dev.cmd = MOTO_DRV_NONE;
+    moto_dev.state = MOTO_STATE_IDLE;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    //moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = moto_dev.dev_param[MOTO_HDEV].default_step;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_HDEV].is_running = 0;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+
+void vccw_start(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
+    moto_dev.cmd = MOTO_DRV_VCCW;
+    moto_dev.state = MOTO_STATE_TRIMMING;
+    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
+    moto_dev.pulse_cnt = 0;
+
+    moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_VDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_VDEV].default_step = V_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 1;
+
+    TIMER3_ENABLE;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void vccw_run(void)
+{
+    struct moto_step_drv *pmsd;
+
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    if(moto_dev.pulse_num == moto_dev.pulse_cnt)
+    {
+        /* moto action stop */
+	moto_action_stop();
+	return;
+    }
+    pmsd = moto_dev.dev_param[MOTO_VDEV].ordertab[MOTO_CCW];
+    pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+    HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+
+    moto_dev.pulse_cnt++;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void vccw_stop(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    TIMER3_DISABLE;
+
+    moto_dev.cmd = MOTO_DRV_NONE;
+    moto_dev.state = MOTO_STATE_IDLE;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    //moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_VDEV].curr_step = moto_dev.dev_param[MOTO_HDEV].default_step;
+    //moto_dev.dev_param[MOTO_VDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 0;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void vcw_start(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
+    moto_dev.cmd = MOTO_DRV_VCW;
+    moto_dev.state = MOTO_STATE_TRIMMING;
+    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
+    moto_dev.pulse_cnt = 0;
+
+    moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_VDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_VDEV].default_step = V_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 1;
+
+    TIMER3_ENABLE;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void vcw_run(void)
+{
+    struct moto_step_drv *pmsd;
+
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    if(moto_dev.pulse_num == moto_dev.pulse_cnt)
+    {
+        /* moto action stop */
+	moto_action_stop();
+	return;
+    }
+    pmsd = moto_dev.dev_param[MOTO_VDEV].ordertab[MOTO_CW];
+    pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+    HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+
+    moto_dev.pulse_cnt++;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void vcw_stop(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    TIMER3_DISABLE;
+
+    moto_dev.cmd = MOTO_DRV_NONE;
+    moto_dev.state = MOTO_STATE_IDLE;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    //moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_VDEV].curr_step = moto_dev.dev_param[MOTO_HDEV].default_step;
+    //moto_dev.dev_param[MOTO_VDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 0;
+    MOTO_DRV_LOG("%s exit\n",__func__);
 }
 
 long moto_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
     struct moto_drv_action *pmda = (struct moto_drv_action *)arg;
 	
+    MOTO_DRV_LOG("%s entry\n",__func__);
 	switch(cmd)
 	{
 		case MOTO_DRV_SELF_TEST:
+		case MOTO_DRV_HCCW:
+		case MOTO_DRV_HCW:
+		case MOTO_DRV_VCCW:
+		case MOTO_DRV_VCW:
 			/* moto action start */
-			if(moto_dev.state == MOTO_STATE_IDLE)
-			{
-				moto_action_start(cmd, arg);
-			}
-			else
-			{
-				return -1;
-			}
+			MOTO_DRV_LOG("%s action 11111\n",__func__);
+			if(moto_dev.state != MOTO_STATE_IDLE) return -1;
+			MOTO_DRV_LOG("%s action 22222\n",__func__);
+			moto_action_start(cmd, arg);
 			break;
-		
+
 		case MOTO_DRV_NONE:
 			moto_action_none(arg);
 			break;
@@ -386,15 +620,33 @@ long moto_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		default:
 			return -1;
 	}
+    MOTO_DRV_LOG("%s exit\n",__func__);
     return 0;
 }
 
+static atomic_t moto_s_available = ATOMIC_INIT(1);
 int moto_open(struct inode * inode, struct file * file)
 {
+    MOTO_DRV_LOG("%s entry\n",__func__);
+#if 0
+    if(! atomic_dec_and_test(&moto_s_available) )
+    {
+        atomic_inc(&moto_s_available);
+        printk("%s Error: device already open.\n",__func__);
+        return -EBUSY;
+    }
+#endif
+    MOTO_DRV_LOG("%s exit\n",__func__);
     return 0;
 }
 int moto_close(struct inode * inode, struct file * file)
 {
+    MOTO_DRV_LOG("%s entry\n",__func__);
+#if 0
+    TIMER3_DISABLE;
+    atomic_inc(&moto_s_available);
+#endif
+    MOTO_DRV_LOG("%s exit\n",__func__);
     return 0;
 }
 
@@ -486,7 +738,6 @@ static int __init moto_drv_init(void)
         HW_REG(SC_CTRL_REG) |= (1<<22);
     }
 
-    //HW_REG(TIMER3_CONTROL_REG) = (1<<7)|(1<<6)|(1<<5)|(1<<1)|(0x01<<2);
     HW_REG(TIMER3_CONTROL_REG) = (1<<6)|(1<<5)|(1<<1)|(0x01<<2);
 
     MOTO_DRV_LOG("%s init ok. ver=%s, %s.\n", __func__, __DATE__, __TIME__);

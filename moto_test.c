@@ -5,6 +5,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
+#include <error.h>
 
 #include "moto_drv.h"
 
@@ -14,38 +16,136 @@
 #define MOTO_LOG
 #endif
 
-#define DOIT_CHAR_L "l"
-#define DOIT_CHAR_R "r"
-#define DOIT_CHAR_U "u"
-#define DOIT_CHAR_D "d"
+#define DO_SELF_TEST_CHAR "st"
+#define DO_HCCW_CHAR "hccw"
+#define DO_HCW_CHAR "hcw"
+#define DO_VCCW_CHAR "vccw"
+#define DO_VCW_CHAR "vcw"
 
 #define MAX_CHAR_LEN (16)
 
-typedef void (*func_doit)(int , void *);
+typedef void (*do_func)(int fd, int argc, char *argv[]);
+
+struct func_arr {
+	char *cmd;
+	void *func;
+};
+
+void do_self_test(int fd, int argc , char* argv[]);
+void do_hccw(int fd, int argc , char* argv[]);
+void do_hcw(int fd, int argc , char* argv[]);
+void do_vccw(int fd, int argc , char* argv[]);
+void do_vcw(int fd, int argc , char* argv[]);
+
+struct func_arr func_tab[] = {
+	{DO_SELF_TEST_CHAR,do_self_test}
+	,{DO_HCCW_CHAR,do_hccw}
+	,{DO_HCW_CHAR,do_hcw}
+	,{DO_VCCW_CHAR,do_vccw}
+	,{DO_VCW_CHAR,do_vcw}
+	,{NULL,NULL}
+};
 
 int main_dbg(int argc , char* argv[])
 {
     return(0);
 }
 
-void do_self_test(int fd, void *params)
+void do_self_test(int fd, int argc , char* argv[])
 {
     int ret =0;
-    ret = ioctl(fd, MOTO_DRV_SELF_TEST, NULL);
-    /* wait here for self test completing */
+
+    ret = ioctl(fd, MOTO_DRV_SELF_TEST);
+    /* wait here for completing */
+}
+
+void do_hccw(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int nsteps=0;
+
+    if(argc < 3) return;
+    nsteps = atol(argv[2]);
+    MOTO_LOG("%s nsteps=%d\n",__func__,nsteps);
+    ret = ioctl(fd, MOTO_DRV_HCCW, &nsteps);
+    MOTO_LOG("%s ret=%d, %s\n",__func__,ret, strerror(errno));
+    /* wait here for completing */
+}
+
+void do_hcw(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int nsteps=0;
+
+    if(argc < 3) return;
+    nsteps = atol(argv[2]);
+    MOTO_LOG("%s nsteps=%d\n",__func__,nsteps);
+    ret = ioctl(fd, MOTO_DRV_HCW, &nsteps);
+    MOTO_LOG("%s ret=%d, %s\n",__func__,ret, strerror(errno));
+    /* wait here for completing */
+}
+void do_vccw(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int nsteps=0;
+
+    if(argc < 3) return;
+    nsteps = atol(argv[2]);
+    MOTO_LOG("%s nsteps=%d\n",__func__,nsteps);
+    ret = ioctl(fd, MOTO_DRV_VCCW, &nsteps);
+    MOTO_LOG("%s ret=%d, %s\n",__func__,ret, strerror(errno));
+    /* wait here for completing */
+}
+
+void do_vcw(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int nsteps=0;
+
+    if(argc < 3) return;
+    nsteps = atol(argv[2]);
+    MOTO_LOG("%s nsteps=%d\n",__func__,nsteps);
+    ret = ioctl(fd, MOTO_DRV_VCW, &nsteps);
+    MOTO_LOG("%s ret=%d, %s\n",__func__,ret, strerror(errno));
+    /* wait here for completing */
+}
+void *get_func(char *cmd)
+{
+	struct func_arr *fa = &func_tab[0];
+
+	while(fa->cmd)
+	{
+		if(strcmp(cmd,fa->cmd) == 0)
+		{
+			MOTO_LOG("%s OK!!!\n",__func__);
+			break;
+		}
+		fa++;
+	}
+	
+	return(fa->func);
 }
 
 int main_body(int argc , char* argv[])
 {
 	int fd = -1;
+	do_func func = NULL;
+
+	if(argc < 2) return -1;
+	
 	fd = open("/dev/" MOTO_DEVICE_NAME, 0);
     if(fd<0)
     {
-    	printf("Open gpioi2c error!\n");
+    	printf("Open "MOTO_DEVICE_NAME" error!\n");
     	return -1;
     }
-	do_self_test(fd, NULL);
-
+    MOTO_LOG("%s open ok\n",__func__);
+	func = (do_func)get_func(argv[1]);
+    MOTO_LOG("%s get func ok\n",__func__);
+	if(!func) return -1;
+    MOTO_LOG("%s exec func ok\n",__func__);
+	func(fd, argc, argv);
+	
 	close(fd);
 	return 0;
 }
