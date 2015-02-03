@@ -16,12 +16,15 @@
 #define MOTO_LOG
 #endif
 
-#define DO_SELF_TEST_CHAR "st"
+#define DO_SELF_TEST_CHAR "selftest"
 #define DO_HCCW_CHAR "hccw"
 #define DO_HCW_CHAR "hcw"
 #define DO_VCCW_CHAR "vccw"
 #define DO_VCW_CHAR "vcw"
 #define DO_HCRUISING_CHAR "hcruising"
+#define DO_VCRUISING_CHAR "vcruising"
+#define DO_HVCRUISING_CHAR "hvcruising"
+#define DO_STOP_CHAR "stop"
 
 #define MAX_CHAR_LEN (16)
 
@@ -38,6 +41,9 @@ void do_hcw(int fd, int argc , char* argv[]);
 void do_vccw(int fd, int argc , char* argv[]);
 void do_vcw(int fd, int argc , char* argv[]);
 void do_hcruising(int fd, int argc , char* argv[]);
+void do_vcruising(int fd, int argc , char* argv[]);
+void do_hvcruising(int fd, int argc , char* argv[]);
+void do_stop(int fd, int argc , char* argv[]);
 
 struct func_arr func_tab[] = {
 	{DO_SELF_TEST_CHAR,do_self_test}
@@ -46,6 +52,9 @@ struct func_arr func_tab[] = {
 	,{DO_VCCW_CHAR,do_vccw}
 	,{DO_VCW_CHAR,do_vcw}
 	,{DO_HCRUISING_CHAR,do_hcruising}
+	,{DO_VCRUISING_CHAR,do_vcruising}
+	,{DO_HVCRUISING_CHAR,do_hvcruising}
+	,{DO_STOP_CHAR,do_stop}
 	,{NULL,NULL}
 };
 
@@ -125,6 +134,43 @@ void do_hcruising(int fd, int argc , char* argv[])
         ret = ioctl(fd, MTDRV_GET_STATE,&state);
     }
     ret = ioctl(fd, MTDRV_HCRUISING);
+    /* wait here for completing */
+}
+void do_vcruising(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int state=0xFFFFFFFF;
+
+    ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    while(MOTO_STATE_IDLE != state)
+    {
+        ret = ioctl(fd, MTDRV_STOP);
+        usleep(100);
+        ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    }
+    ret = ioctl(fd, MTDRV_VCRUISING);
+    /* wait here for completing */
+}
+void do_hvcruising(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int state=0xFFFFFFFF;
+
+    ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    while(MOTO_STATE_IDLE != state)
+    {
+        ret = ioctl(fd, MTDRV_STOP);
+        usleep(100);
+        ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    }
+    ret = ioctl(fd, MTDRV_HVCRUISING);
+    /* wait here for completing */
+}
+void do_stop(int fd, int argc , char* argv[])
+{
+    int ret =0;
+
+    ret = ioctl(fd, MTDRV_STOP);
     /* wait here for completing */
 }
 void *get_func(char *cmd)

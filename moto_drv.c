@@ -139,6 +139,12 @@ void vcw_stop(void);
 void hcruising_start(void);
 void hcruising_run(void);
 void hcruising_stop(void);
+void vcruising_start(void);
+void vcruising_run(void);
+void vcruising_stop(void);
+void hvcruising_start(void);
+void hvcruising_run(void);
+void hvcruising_stop(void);
 
 
 #if (8 == ONE_STEP_PULSE)
@@ -228,6 +234,8 @@ struct moto_action_func moto_action_func_tab[] = {
     	,{MTDRV_VCCW,vccw_start,vccw_run,vccw_stop}
     	,{MTDRV_VCW,vcw_start,vcw_run,vcw_stop}
     	,{MTDRV_HCRUISING,hcruising_start,hcruising_run,hcruising_stop}
+    	,{MTDRV_VCRUISING,vcruising_start,vcruising_run,vcruising_stop}
+    	,{MTDRV_HVCRUISING,hvcruising_start,hvcruising_run,hvcruising_stop}
 	,{0xFFFFFFFF,NULL,NULL,NULL}
 };
 #define MOTO_ACITON_FUNC_TAB_SIZE (sizeof(moto_action_func_tab)/sizeof(moto_action_func_tab[0]))
@@ -658,6 +666,7 @@ void hcruising_run(void)
     if((moto_dev.to_idle == 1) && ((moto_dev.pulse_cnt%ONE_STEP_PULSE) == 0))
     {
         /* moto action stop */
+	MOTO_DRV_LOG("%s stop\n",__func__);
 	moto_action_stop();
 	return;
     }
@@ -705,6 +714,206 @@ void hcruising_stop(void)
     moto_dev.to_idle = 0;
     MOTO_DRV_LOG("%s exit\n",__func__);
 }
+void vcruising_start(void)
+{
+    //unsigned int nsteps = *(unsigned int *)moto_dev.arg;
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    moto_dev.cmd = MTDRV_VCRUISING;
+    moto_dev.state = MOTO_STATE_CRUISING;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_VDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_VDEV].default_step = V_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 1;
+    if(moto_dev.dev_param[MOTO_VDEV].curr_step < (V_MAX_PLULSE/ONE_STEP_PULSE)/2)
+    {
+        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CW;
+    }
+    else
+    {
+        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CCW;
+    }
+
+    TIMER3_ENABLE;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void vcruising_run(void)
+{
+    struct moto_step_drv *pmsd;
+
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    if((moto_dev.to_idle == 1) && ((moto_dev.pulse_cnt%ONE_STEP_PULSE) == 0))
+    {
+        /* moto action stop */
+	MOTO_DRV_LOG("%s stop\n",__func__);
+	moto_action_stop();
+	return;
+    }
+    pmsd = moto_dev.dev_param[MOTO_VDEV].ordertab[moto_dev.dev_param[MOTO_VDEV].curr_dir];
+    pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+    HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+
+    moto_dev.pulse_cnt++;
+    moto_dev.pulse_cnt %= ONE_STEP_PULSE;
+    if(0 == moto_dev.pulse_cnt)
+    {
+        if(MOTO_CW == moto_dev.dev_param[MOTO_VDEV].curr_dir)
+        {
+            moto_dev.dev_param[MOTO_VDEV].curr_step++;
+            if(moto_dev.dev_param[MOTO_VDEV].curr_step > (V_MAX_PLULSE/ONE_STEP_PULSE))
+            {
+                moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CCW;
+            }
+        }
+        else if(MOTO_CCW == moto_dev.dev_param[MOTO_VDEV].curr_dir)
+        {
+            moto_dev.dev_param[MOTO_VDEV].curr_step--;
+            if(0 == moto_dev.dev_param[MOTO_VDEV].curr_step)
+            {
+                moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CW;
+            }
+        }
+    }
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void vcruising_stop(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    TIMER3_DISABLE;
+
+    moto_dev.cmd = MTDRV_NONE;
+    moto_dev.state = MOTO_STATE_IDLE;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    //moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = moto_dev.dev_param[MOTO_HDEV].default_step;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 0;
+    moto_dev.to_idle = 0;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+
+void hvcruising_start(void)
+{
+    //unsigned int nsteps = *(unsigned int *)moto_dev.arg;
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    /* =========================================================== */
+    moto_dev.cmd = MTDRV_HVCRUISING;
+    moto_dev.state = MOTO_STATE_CRUISING;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = H_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_HDEV].is_running = 1;
+    if(moto_dev.dev_param[MOTO_HDEV].curr_step < (H_MAX_PLULSE/ONE_STEP_PULSE)/2)
+    {
+        moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CW;
+    }
+    else
+    {
+        moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CCW;
+    }
+
+    moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_VDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_VDEV].default_step = V_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 1;
+    if(moto_dev.dev_param[MOTO_VDEV].curr_step < (V_MAX_PLULSE/ONE_STEP_PULSE)/2)
+    {
+        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CW;
+    }
+    else
+    {
+        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CCW;
+    }
+
+    TIMER3_ENABLE;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void hvcruising_run(void)
+{
+    struct moto_step_drv *pmsd;
+
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    if((moto_dev.to_idle == 1) && ((moto_dev.pulse_cnt%ONE_STEP_PULSE) == 0))
+    {
+        /* moto action stop */
+	MOTO_DRV_LOG("%s stop\n",__func__);
+	moto_action_stop();
+	return;
+    }
+
+    pmsd = moto_dev.dev_param[MOTO_HDEV].ordertab[moto_dev.dev_param[MOTO_HDEV].curr_dir];
+    pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+    HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+
+    pmsd = moto_dev.dev_param[MOTO_VDEV].ordertab[moto_dev.dev_param[MOTO_VDEV].curr_dir];
+    pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+    HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+
+    moto_dev.pulse_cnt++;
+    moto_dev.pulse_cnt %= ONE_STEP_PULSE;
+    if(0 == moto_dev.pulse_cnt)
+    {
+        if(MOTO_CW == moto_dev.dev_param[MOTO_HDEV].curr_dir)
+        {
+            moto_dev.dev_param[MOTO_HDEV].curr_step++;
+            if(moto_dev.dev_param[MOTO_HDEV].curr_step > (H_MAX_PLULSE/ONE_STEP_PULSE))
+            {
+                moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CCW;
+            }
+        }
+        else if(MOTO_CCW == moto_dev.dev_param[MOTO_HDEV].curr_dir)
+        {
+            moto_dev.dev_param[MOTO_HDEV].curr_step--;
+            if(0 == moto_dev.dev_param[MOTO_HDEV].curr_step)
+            {
+                moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CW;
+            }
+        }
+
+        if(MOTO_CW == moto_dev.dev_param[MOTO_VDEV].curr_dir)
+        {
+            moto_dev.dev_param[MOTO_VDEV].curr_step++;
+            if(moto_dev.dev_param[MOTO_VDEV].curr_step > (V_MAX_PLULSE/ONE_STEP_PULSE))
+            {
+                moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CCW;
+            }
+        }
+        else if(MOTO_CCW == moto_dev.dev_param[MOTO_VDEV].curr_dir)
+        {
+            moto_dev.dev_param[MOTO_VDEV].curr_step--;
+            if(0 == moto_dev.dev_param[MOTO_VDEV].curr_step)
+            {
+                moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CW;
+            }
+        }
+    }
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void hvcruising_stop(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    TIMER3_DISABLE;
+
+    moto_dev.cmd = MTDRV_NONE;
+    moto_dev.state = MOTO_STATE_IDLE;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    //moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = moto_dev.dev_param[MOTO_HDEV].default_step;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_HDEV].is_running = 0;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 0;
+    moto_dev.to_idle = 0;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
 
 long moto_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -719,6 +928,8 @@ long moto_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		case MTDRV_VCCW:
 		case MTDRV_VCW:
 		case MTDRV_HCRUISING:
+		case MTDRV_VCRUISING:
+		case MTDRV_HVCRUISING:
 			/* moto action start */
 			MOTO_DRV_LOG("%s action 11111\n",__func__);
 			if(moto_dev.state != MOTO_STATE_IDLE) return -1;
@@ -727,10 +938,12 @@ long moto_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			break;
 
 		case MTDRV_GET_STATE:
+			MOTO_DRV_LOG("%s MTDRV_GET_STATE\n",__func__);
 			*(unsigned int *)arg = (unsigned int)moto_dev.state;
 			break;
 
 		case MTDRV_STOP:
+			MOTO_DRV_LOG("%s MTDRV_STOP\n",__func__);
 			moto_dev.to_idle = 1;
 			break;
 
