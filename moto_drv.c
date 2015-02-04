@@ -37,7 +37,7 @@
 #define V_MAX_PLULSE (1712)
 
 /* ONE_STEP_PULSE/step */
-#define H_MOTO_DEFAULT_STEP (0)
+#define H_MOTO_DEFAULT_STEP (H_MAX_PLULSE/2)
 #define V_MOTO_DEFAULT_STEP (142)
 
 #define GPIO_5_BASE (0x20190000)
@@ -80,11 +80,6 @@ struct moto_step_drv {
 };
 #define ONE_STEP_PULSE (8)
 
-struct moto_pos {
-    int hpos;
-    int vpos;
-};
-
 #define PRESET_POS_NUM (8)
 typedef struct
 {
@@ -93,9 +88,14 @@ typedef struct
     int default_step;
     int is_running;
     int curr_dir;
-    struct moto_pos preset_pos[PRESET_POS_NUM];
+    //struct moto_pos preset_pos[PRESET_POS_NUM];
     struct moto_step_drv *ordertab[MOTO_ORDER_NUM];
 }moto_dev_param;
+
+union inparams {
+	unsigned int nsteps;
+	struct moto_pos pos;
+};
 
 typedef struct
 {
@@ -107,6 +107,7 @@ typedef struct
     int pulse_cnt;/**/
     int to_idle;
     unsigned long arg;
+    union inparams ins;
 }moto_dev_struct;
 
 struct moto_action_func {
@@ -145,6 +146,9 @@ void vcruising_stop(void);
 void hvcruising_start(void);
 void hvcruising_run(void);
 void hvcruising_stop(void);
+void topos_start(void);
+void topos_run(void);
+void topos_stop(void);
 
 
 #if (8 == ONE_STEP_PULSE)
@@ -236,6 +240,7 @@ struct moto_action_func moto_action_func_tab[] = {
     	,{MTDRV_HCRUISING,hcruising_start,hcruising_run,hcruising_stop}
     	,{MTDRV_VCRUISING,vcruising_start,vcruising_run,vcruising_stop}
     	,{MTDRV_HVCRUISING,hvcruising_start,hvcruising_run,hvcruising_stop}
+    	,{MTDRV_TO_POS,topos_start,topos_run,topos_stop}
 	,{0xFFFFFFFF,NULL,NULL,NULL}
 };
 #define MOTO_ACITON_FUNC_TAB_SIZE (sizeof(moto_action_func_tab)/sizeof(moto_action_func_tab[0]))
@@ -336,7 +341,7 @@ void self_test_start(void)
     moto_dev.is_self_test = 0;
     moto_dev.cmd = MTDRV_SELF_TEST;
     moto_dev.state = MOTO_STATE_SELF_TEST;
-    moto_dev.pulse_num = H_MAX_PLULSE;
+    moto_dev.pulse_num = H_MAX_PLULSE+H_MOTO_DEFAULT_STEP;
     moto_dev.pulse_cnt = 0;
 
     moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
@@ -361,7 +366,14 @@ void self_test_run(void)
 	moto_action_stop();
 	return;
     }
-    pmsd = moto_dev.dev_param[MOTO_HDEV].ordertab[MOTO_CCW];
+    if(moto_dev.pulse_cnt < H_MAX_PLULSE)
+    {
+        pmsd = moto_dev.dev_param[MOTO_HDEV].ordertab[MOTO_CCW];
+    }
+    else
+    {
+        pmsd = moto_dev.dev_param[MOTO_HDEV].ordertab[MOTO_CW];
+    }
     pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
     HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
 
@@ -405,11 +417,11 @@ void self_test_stop(void)
 
 void hccw_start(void)
 {
-    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
+    moto_dev.ins.nsteps = *(unsigned int *)moto_dev.arg;
     moto_dev.cmd = MTDRV_HCCW;
     moto_dev.state = MOTO_STATE_TRIMMING;
-    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
+    moto_dev.pulse_num = moto_dev.ins.nsteps*ONE_STEP_PULSE;
     moto_dev.pulse_cnt = 0;
 
     moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
@@ -440,7 +452,6 @@ void hccw_run(void)
 }
 void hccw_stop(void)
 {
-    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     TIMER3_DISABLE;
 
@@ -450,7 +461,7 @@ void hccw_stop(void)
     moto_dev.pulse_cnt = 0;
 
     //moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
-    moto_dev.dev_param[MOTO_HDEV].curr_step -= nsteps;
+    moto_dev.dev_param[MOTO_HDEV].curr_step -= moto_dev.ins.nsteps;
     if(moto_dev.dev_param[MOTO_HDEV].curr_step < 0)
     {
         moto_dev.dev_param[MOTO_HDEV].curr_step = 0;
@@ -462,11 +473,11 @@ void hccw_stop(void)
 }
 void hcw_start(void)
 {
-    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
+    moto_dev.ins.nsteps = *(unsigned int *)moto_dev.arg;
     moto_dev.cmd = MTDRV_HCW;
     moto_dev.state = MOTO_STATE_TRIMMING;
-    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
+    moto_dev.pulse_num = moto_dev.ins.nsteps*ONE_STEP_PULSE;
     moto_dev.pulse_cnt = 0;
 
     moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
@@ -497,7 +508,6 @@ void hcw_run(void)
 }
 void hcw_stop(void)
 {
-    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     TIMER3_DISABLE;
 
@@ -507,7 +517,7 @@ void hcw_stop(void)
     moto_dev.pulse_cnt = 0;
 
     //moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
-    moto_dev.dev_param[MOTO_HDEV].curr_step += nsteps;
+    moto_dev.dev_param[MOTO_HDEV].curr_step += moto_dev.ins.nsteps;
     if(moto_dev.dev_param[MOTO_HDEV].curr_step > (H_MAX_PLULSE/ONE_STEP_PULSE))
     {
         moto_dev.dev_param[MOTO_HDEV].curr_step = (H_MAX_PLULSE/ONE_STEP_PULSE);
@@ -520,11 +530,11 @@ void hcw_stop(void)
 
 void vccw_start(void)
 {
-    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
+    moto_dev.ins.nsteps = *(unsigned int *)moto_dev.arg;
     moto_dev.cmd = MTDRV_VCCW;
     moto_dev.state = MOTO_STATE_TRIMMING;
-    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
+    moto_dev.pulse_num = moto_dev.ins.nsteps*ONE_STEP_PULSE;
     moto_dev.pulse_cnt = 0;
 
     moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
@@ -555,7 +565,6 @@ void vccw_run(void)
 }
 void vccw_stop(void)
 {
-    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     TIMER3_DISABLE;
 
@@ -565,7 +574,7 @@ void vccw_stop(void)
     moto_dev.pulse_cnt = 0;
 
     //moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
-    moto_dev.dev_param[MOTO_VDEV].curr_step -= nsteps;
+    moto_dev.dev_param[MOTO_VDEV].curr_step -= moto_dev.ins.nsteps;
     if(moto_dev.dev_param[MOTO_VDEV].curr_step < 0)
     {
         moto_dev.dev_param[MOTO_VDEV].curr_step = 0;
@@ -577,11 +586,11 @@ void vccw_stop(void)
 }
 void vcw_start(void)
 {
-    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
+    moto_dev.ins.nsteps = *(unsigned int *)moto_dev.arg;
     moto_dev.cmd = MTDRV_VCW;
     moto_dev.state = MOTO_STATE_TRIMMING;
-    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
+    moto_dev.pulse_num = moto_dev.ins.nsteps*ONE_STEP_PULSE;
     moto_dev.pulse_cnt = 0;
 
     moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
@@ -612,7 +621,6 @@ void vcw_run(void)
 }
 void vcw_stop(void)
 {
-    unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     TIMER3_DISABLE;
 
@@ -622,7 +630,7 @@ void vcw_stop(void)
     moto_dev.pulse_cnt = 0;
 
     //moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
-    moto_dev.dev_param[MOTO_VDEV].curr_step += nsteps;
+    moto_dev.dev_param[MOTO_VDEV].curr_step += moto_dev.ins.nsteps;
     if(moto_dev.dev_param[MOTO_VDEV].curr_step > (V_MAX_PLULSE/ONE_STEP_PULSE))
     {
         moto_dev.dev_param[MOTO_VDEV].curr_step = (V_MAX_PLULSE/ONE_STEP_PULSE);
@@ -635,7 +643,6 @@ void vcw_stop(void)
 
 void hcruising_start(void)
 {
-    //unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     moto_dev.cmd = MTDRV_HCRUISING;
     moto_dev.state = MOTO_STATE_CRUISING;
@@ -716,7 +723,6 @@ void hcruising_stop(void)
 }
 void vcruising_start(void)
 {
-    //unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     moto_dev.cmd = MTDRV_VCRUISING;
     moto_dev.state = MOTO_STATE_CRUISING;
@@ -798,7 +804,6 @@ void vcruising_stop(void)
 
 void hvcruising_start(void)
 {
-    //unsigned int nsteps = *(unsigned int *)moto_dev.arg;
     MOTO_DRV_LOG("%s entry\n",__func__);
     /* =========================================================== */
     moto_dev.cmd = MTDRV_HVCRUISING;
@@ -914,6 +919,143 @@ void hvcruising_stop(void)
     moto_dev.to_idle = 0;
     MOTO_DRV_LOG("%s exit\n",__func__);
 }
+void topos_start(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    /* =========================================================== */
+    moto_dev.ins.pos.hpos = ((struct moto_pos *)moto_dev.arg)->hpos;
+    moto_dev.ins.pos.vpos = ((struct moto_pos *)moto_dev.arg)->vpos;
+    moto_dev.cmd = MTDRV_TO_POS;
+    moto_dev.state = MOTO_STATE_TOPOS;
+    moto_dev.pulse_num = ((moto_dev.ins.pos.hpos > moto_dev.ins.pos.vpos)?(moto_dev.ins.pos.hpos):(moto_dev.ins.pos.vpos))*ONE_STEP_PULSE;
+    printk("%s moto_dev.pulse_num=%d moto_dev.ins.pos.hpos=%d moto_dev.ins.pos.vpos=%d\n",__func__,moto_dev.pulse_num,moto_dev.ins.pos.hpos,moto_dev.ins.pos.vpos);
+    moto_dev.pulse_cnt = 0;
+
+    moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = H_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_HDEV].is_running = 1;
+    if(moto_dev.dev_param[MOTO_HDEV].curr_step < moto_dev.ins.pos.hpos)
+    {
+        moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CW;
+    }
+    else
+    {
+        moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CCW;
+    }
+
+    moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_VDEV].curr_step = -1;
+    //moto_dev.dev_param[MOTO_VDEV].default_step = V_MOTO_DEFAULT_STEP;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 1;
+    if(moto_dev.dev_param[MOTO_VDEV].curr_step < moto_dev.ins.pos.vpos)
+    {
+        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CW;
+    }
+    else
+    {
+        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CCW;
+    }
+
+    TIMER3_ENABLE;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void topos_run(void)
+{
+    struct moto_step_drv *pmsd;
+
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    if(moto_dev.pulse_num == moto_dev.pulse_cnt)
+    {
+        /* moto action stop */
+	MOTO_DRV_LOG("%s stop\n",__func__);
+	moto_action_stop();
+	return;
+    }
+
+    if(moto_dev.dev_param[MOTO_HDEV].curr_step != moto_dev.ins.pos.hpos)
+    {
+        pmsd = moto_dev.dev_param[MOTO_HDEV].ordertab[moto_dev.dev_param[MOTO_HDEV].curr_dir];
+        pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+        HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+    }
+
+    if(moto_dev.dev_param[MOTO_VDEV].curr_step != moto_dev.ins.pos.vpos)
+    {
+        pmsd = moto_dev.dev_param[MOTO_VDEV].ordertab[moto_dev.dev_param[MOTO_VDEV].curr_dir];
+        pmsd += moto_dev.pulse_cnt%ONE_STEP_PULSE;
+        HW_REG(IO_ADDRESS(GPIO_9_BASE + pmsd->regoff)) = pmsd->portval;
+    }
+
+    moto_dev.pulse_cnt++;
+    if(0 == moto_dev.pulse_cnt%ONE_STEP_PULSE)
+    {
+        if(MOTO_CW == moto_dev.dev_param[MOTO_HDEV].curr_dir)
+        {
+            if(moto_dev.dev_param[MOTO_HDEV].curr_step != moto_dev.ins.pos.hpos)
+            {
+                moto_dev.dev_param[MOTO_HDEV].curr_step++;
+            }
+            if(moto_dev.dev_param[MOTO_HDEV].curr_step > (H_MAX_PLULSE/ONE_STEP_PULSE))
+            {
+                moto_dev.dev_param[MOTO_HDEV].curr_step = (H_MAX_PLULSE/ONE_STEP_PULSE);
+            }
+        }
+        else if(MOTO_CCW == moto_dev.dev_param[MOTO_HDEV].curr_dir)
+        {
+            if(moto_dev.dev_param[MOTO_HDEV].curr_step != moto_dev.ins.pos.hpos)
+            {
+                moto_dev.dev_param[MOTO_HDEV].curr_step--;
+            }
+            if(0 > moto_dev.dev_param[MOTO_HDEV].curr_step)
+            {
+                moto_dev.dev_param[MOTO_HDEV].curr_step = 0;
+            }
+        }
+
+        if(MOTO_CW == moto_dev.dev_param[MOTO_VDEV].curr_dir)
+        {
+            if(moto_dev.dev_param[MOTO_VDEV].curr_step != moto_dev.ins.pos.vpos)
+            {
+                moto_dev.dev_param[MOTO_VDEV].curr_step++;
+            }
+            if(moto_dev.dev_param[MOTO_VDEV].curr_step > (V_MAX_PLULSE/ONE_STEP_PULSE))
+            {
+                moto_dev.dev_param[MOTO_VDEV].curr_step = (V_MAX_PLULSE/ONE_STEP_PULSE);
+            }
+        }
+        else if(MOTO_CCW == moto_dev.dev_param[MOTO_VDEV].curr_dir)
+        {
+            if(moto_dev.dev_param[MOTO_VDEV].curr_step != moto_dev.ins.pos.vpos)
+            {
+                moto_dev.dev_param[MOTO_VDEV].curr_step--;
+            }
+            if(0 > moto_dev.dev_param[MOTO_VDEV].curr_step)
+            {
+                moto_dev.dev_param[MOTO_VDEV].curr_step = 0;
+            }
+        }
+    }
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
+void topos_stop(void)
+{
+    MOTO_DRV_LOG("%s entry\n",__func__);
+    TIMER3_DISABLE;
+
+    moto_dev.cmd = MTDRV_NONE;
+    moto_dev.state = MOTO_STATE_IDLE;
+    moto_dev.pulse_num = -1;
+    moto_dev.pulse_cnt = 0;
+
+    //moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
+    //moto_dev.dev_param[MOTO_HDEV].curr_step = moto_dev.dev_param[MOTO_HDEV].default_step;
+    //moto_dev.dev_param[MOTO_HDEV].default_step = -1;
+    moto_dev.dev_param[MOTO_HDEV].is_running = 0;
+    moto_dev.dev_param[MOTO_VDEV].is_running = 0;
+    moto_dev.to_idle = 0;
+    MOTO_DRV_LOG("%s exit\n",__func__);
+}
 
 long moto_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
@@ -930,6 +1072,7 @@ long moto_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		case MTDRV_HCRUISING:
 		case MTDRV_VCRUISING:
 		case MTDRV_HVCRUISING:
+		case MTDRV_TO_POS:
 			/* moto action start */
 			MOTO_DRV_LOG("%s action 11111\n",__func__);
 			if(moto_dev.state != MOTO_STATE_IDLE) return -1;
@@ -940,6 +1083,12 @@ long moto_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		case MTDRV_GET_STATE:
 			MOTO_DRV_LOG("%s MTDRV_GET_STATE\n",__func__);
 			*(unsigned int *)arg = (unsigned int)moto_dev.state;
+			break;
+
+		case MTDRV_GET_POS:
+			MOTO_DRV_LOG("%s MTDRV_GET_POS\n",__func__);
+			((struct moto_pos *)arg)->hpos = moto_dev.dev_param[MOTO_HDEV].curr_step;
+			((struct moto_pos *)arg)->vpos = moto_dev.dev_param[MOTO_VDEV].curr_step;
 			break;
 
 		case MTDRV_STOP:
@@ -1044,11 +1193,11 @@ static int __init moto_drv_init(void)
 
     moto_dev.dev_param[MOTO_HDEV].ordertab[MOTO_CW]= &h_cwtab[0];
     moto_dev.dev_param[MOTO_HDEV].ordertab[MOTO_CCW]= &h_ccwtab[0];
-    memset(&moto_dev.dev_param[MOTO_HDEV].preset_pos[0], -1, sizeof(struct moto_pos)*PRESET_POS_NUM);
+    //memset(&moto_dev.dev_param[MOTO_HDEV].preset_pos[0], -1, sizeof(struct moto_pos)*PRESET_POS_NUM);
 
     moto_dev.dev_param[MOTO_VDEV].ordertab[MOTO_CW]= &v_cwtab[0];
     moto_dev.dev_param[MOTO_VDEV].ordertab[MOTO_CCW]= &v_ccwtab[0];
-    memset(&moto_dev.dev_param[MOTO_VDEV].preset_pos[0], -1, sizeof(struct moto_pos)*PRESET_POS_NUM);
+    //memset(&moto_dev.dev_param[MOTO_VDEV].preset_pos[0], -1, sizeof(struct moto_pos)*PRESET_POS_NUM);
 
     /*
       * perfect 1:TIMER3_LOAD_REG=0x000035B6 TIMER3_BGLOAD_REG=0x000035B6, Bus Clock, 4 prescale, ONE_STEP_PULSE=4, max steps=2592, horizontal

@@ -25,6 +25,8 @@
 #define DO_VCRUISING_CHAR "vcruising"
 #define DO_HVCRUISING_CHAR "hvcruising"
 #define DO_STOP_CHAR "stop"
+#define DO_GETPOS_CHAR "getpos"
+#define DO_TOPOS_CHAR "topos"
 
 #define MAX_CHAR_LEN (16)
 
@@ -44,6 +46,8 @@ void do_hcruising(int fd, int argc , char* argv[]);
 void do_vcruising(int fd, int argc , char* argv[]);
 void do_hvcruising(int fd, int argc , char* argv[]);
 void do_stop(int fd, int argc , char* argv[]);
+void do_getpos(int fd, int argc , char* argv[]);
+void do_topos(int fd, int argc , char* argv[]);
 
 struct func_arr func_tab[] = {
 	{DO_SELF_TEST_CHAR,do_self_test}
@@ -55,6 +59,8 @@ struct func_arr func_tab[] = {
 	,{DO_VCRUISING_CHAR,do_vcruising}
 	,{DO_HVCRUISING_CHAR,do_hvcruising}
 	,{DO_STOP_CHAR,do_stop}
+	,{DO_GETPOS_CHAR,do_getpos}
+	,{DO_TOPOS_CHAR,do_topos}
 	,{NULL,NULL}
 };
 
@@ -166,6 +172,28 @@ void do_hvcruising(int fd, int argc , char* argv[])
     ret = ioctl(fd, MTDRV_HVCRUISING);
     /* wait here for completing */
 }
+void do_getpos(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    struct moto_pos pos={0};
+
+    ret = ioctl(fd, MTDRV_GET_POS,&pos);
+    /* wait here for completing */
+}
+
+void do_topos(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    struct moto_pos pos={0};
+
+    if(argc < 4) return;
+    pos.hpos = atol(argv[2]);
+    pos.vpos = atol(argv[3]);
+    ret = ioctl(fd, MTDRV_TO_POS, &pos);
+    MOTO_LOG("%s ret=%d, %s\n",__func__,ret, strerror(errno));
+    /* wait here for completing */
+}
+
 void do_stop(int fd, int argc , char* argv[])
 {
     int ret =0;

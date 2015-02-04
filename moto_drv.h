@@ -7,6 +7,11 @@
 #define MOTO_DEVICE_NAME "moto_drv"
 #define MOTO_IOCTL_BASE (0x11)
 
+struct moto_pos {
+    int hpos;
+    int vpos;
+};
+
 enum {
     MTDRV_NONE = _IO(MOTO_IOCTL_BASE,0)
     ,MTDRV_SELF_TEST = _IO(MOTO_IOCTL_BASE,1)
@@ -19,6 +24,8 @@ enum {
     ,MTDRV_STOP = _IO(MOTO_IOCTL_BASE,8)
     ,MTDRV_VCRUISING = _IO(MOTO_IOCTL_BASE,9)
     ,MTDRV_HVCRUISING = _IO(MOTO_IOCTL_BASE,10)
+    ,MTDRV_GET_POS = _IOR(MOTO_IOCTL_BASE,11,struct moto_pos)
+    ,MTDRV_TO_POS = _IOW(MOTO_IOCTL_BASE,12,struct moto_pos)
 };
 
 enum {
@@ -65,6 +72,7 @@ enum {
 	,MOTO_STATE_TRIMMING
 	,MOTO_STATE_CRUISING
 	,MOTO_STATE_CONTROLLING
+	,MOTO_STATE_TOPOS
 };
 
 struct moto_drv_action {
