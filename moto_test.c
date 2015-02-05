@@ -21,6 +21,10 @@
 #define DO_HCW_CHAR "hcw"
 #define DO_VCCW_CHAR "vccw"
 #define DO_VCW_CHAR "vcw"
+#define DO_HCCWB_CHAR "hccwb"
+#define DO_HCWB_CHAR "hcwb"
+#define DO_VCCWB_CHAR "vccwb"
+#define DO_VCWB_CHAR "vcwb"
 #define DO_HCRUISING_CHAR "hcruising"
 #define DO_VCRUISING_CHAR "vcruising"
 #define DO_HVCRUISING_CHAR "hvcruising"
@@ -42,6 +46,10 @@ void do_hccw(int fd, int argc , char* argv[]);
 void do_hcw(int fd, int argc , char* argv[]);
 void do_vccw(int fd, int argc , char* argv[]);
 void do_vcw(int fd, int argc , char* argv[]);
+void do_hccwb(int fd, int argc , char* argv[]);
+void do_hcwb(int fd, int argc , char* argv[]);
+void do_vccwb(int fd, int argc , char* argv[]);
+void do_vcwb(int fd, int argc , char* argv[]);
 void do_hcruising(int fd, int argc , char* argv[]);
 void do_vcruising(int fd, int argc , char* argv[]);
 void do_hvcruising(int fd, int argc , char* argv[]);
@@ -55,6 +63,10 @@ struct func_arr func_tab[] = {
 	,{DO_HCW_CHAR,do_hcw}
 	,{DO_VCCW_CHAR,do_vccw}
 	,{DO_VCW_CHAR,do_vcw}
+	,{DO_HCCWB_CHAR,do_hccwb}
+	,{DO_HCWB_CHAR,do_hcwb}
+	,{DO_VCCWB_CHAR,do_vccwb}
+	,{DO_VCWB_CHAR,do_vcwb}
 	,{DO_HCRUISING_CHAR,do_hcruising}
 	,{DO_VCRUISING_CHAR,do_vcruising}
 	,{DO_HVCRUISING_CHAR,do_hvcruising}
@@ -125,6 +137,68 @@ void do_vcw(int fd, int argc , char* argv[])
     MOTO_LOG("%s nsteps=%d\n",__func__,nsteps);
     ret = ioctl(fd, MTDRV_VCW, &nsteps);
     MOTO_LOG("%s ret=%d, %s\n",__func__,ret, strerror(errno));
+    /* wait here for completing */
+}
+void do_hccwb(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int state=0xFFFFFFFF;
+
+    ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    while(MOTO_STATE_IDLE != state)
+    {
+        ret = ioctl(fd, MTDRV_STOP);
+        usleep(100);
+        ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    }
+    ret = ioctl(fd, MTDRV_HCCWB);
+    /* wait here for completing */
+}
+
+void do_hcwb(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int state=0xFFFFFFFF;
+
+    ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    while(MOTO_STATE_IDLE != state)
+    {
+        ret = ioctl(fd, MTDRV_STOP);
+        usleep(100);
+        ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    }
+    ret = ioctl(fd, MTDRV_HCWB);
+    /* wait here for completing */
+}
+void do_vccwb(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int state=0xFFFFFFFF;
+
+    ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    while(MOTO_STATE_IDLE != state)
+    {
+        ret = ioctl(fd, MTDRV_STOP);
+        usleep(100);
+        ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    }
+    ret = ioctl(fd, MTDRV_VCCWB);
+    /* wait here for completing */
+}
+
+void do_vcwb(int fd, int argc , char* argv[])
+{
+    int ret =0;
+    unsigned int state=0xFFFFFFFF;
+
+    ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    while(MOTO_STATE_IDLE != state)
+    {
+        ret = ioctl(fd, MTDRV_STOP);
+        usleep(100);
+        ret = ioctl(fd, MTDRV_GET_STATE,&state);
+    }
+    ret = ioctl(fd, MTDRV_VCWB);
     /* wait here for completing */
 }
 void do_hcruising(int fd, int argc , char* argv[])
