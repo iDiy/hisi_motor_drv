@@ -1224,40 +1224,78 @@ void hvcruising_stop(void)
 }
 void topos_start(void)
 {
+    unsigned int hsteps,vsteps,nsteps;
     MOTO_DRV_LOG("%s entry\n",__func__);
     /* =========================================================== */
     moto_dev.ins.pos.hpos = ((struct moto_pos *)moto_dev.arg)->hpos;
     moto_dev.ins.pos.vpos = ((struct moto_pos *)moto_dev.arg)->vpos;
     moto_dev.cmd = MTDRV_TO_POS;
     moto_dev.state = MOTO_STATE_TOPOS;
-    moto_dev.pulse_num = ((moto_dev.ins.pos.hpos > moto_dev.ins.pos.vpos)?(moto_dev.ins.pos.hpos):(moto_dev.ins.pos.vpos))*ONE_STEP_PULSE;
+
+    if(moto_dev.dev_param[MOTO_HDEV].curr_step < moto_dev.ins.pos.hpos)
+    {
+        moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CW;
+        if(moto_dev.ins.pos.hpos > (H_MAX_PLULSE/ONE_STEP_PULSE))
+        {
+            hsteps = (H_MAX_PLULSE/ONE_STEP_PULSE) - moto_dev.dev_param[MOTO_HDEV].curr_step;
+        }
+        else
+        {
+            hsteps = moto_dev.ins.pos.hpos - moto_dev.dev_param[MOTO_HDEV].curr_step;
+        }
+    }
+    else
+    {
+        moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CCW;
+        if(moto_dev.ins.pos.hpos < 0)
+        {
+            hsteps = moto_dev.dev_param[MOTO_HDEV].curr_step;
+        }
+        else
+        {
+            hsteps = moto_dev.dev_param[MOTO_HDEV].curr_step - moto_dev.ins.pos.hpos;
+        }
+    }
+
+    if(moto_dev.dev_param[MOTO_VDEV].curr_step < moto_dev.ins.pos.vpos)
+    {
+        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CW;
+        if(moto_dev.ins.pos.vpos > (V_MAX_PLULSE/ONE_STEP_PULSE))
+        {
+            vsteps = (V_MAX_PLULSE/ONE_STEP_PULSE) - moto_dev.dev_param[MOTO_VDEV].curr_step;
+        }
+        else
+        {
+            vsteps = moto_dev.ins.pos.vpos - moto_dev.dev_param[MOTO_VDEV].curr_step;
+        }
+    }
+    else
+    {
+        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CCW;
+        if(moto_dev.ins.pos.vpos < 0)
+        {
+            vsteps = moto_dev.dev_param[MOTO_VDEV].curr_step;
+        }
+        else
+        {
+            vsteps = moto_dev.dev_param[MOTO_VDEV].curr_step - moto_dev.ins.pos.vpos;
+        }
+    }
+
+    nsteps = (hsteps>vsteps)?hsteps:vsteps;
+
+    moto_dev.pulse_num = nsteps*ONE_STEP_PULSE;
     moto_dev.pulse_cnt = 0;
 
     moto_dev.dev_param[MOTO_HDEV].speed = MOTO_SPD_LV5;
     //moto_dev.dev_param[MOTO_HDEV].curr_step = -1;
     //moto_dev.dev_param[MOTO_HDEV].default_step = H_MOTO_DEFAULT_STEP;
     moto_dev.dev_param[MOTO_HDEV].is_running = 1;
-    if(moto_dev.dev_param[MOTO_HDEV].curr_step < moto_dev.ins.pos.hpos)
-    {
-        moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CW;
-    }
-    else
-    {
-        moto_dev.dev_param[MOTO_HDEV].curr_dir = MOTO_CCW;
-    }
 
     moto_dev.dev_param[MOTO_VDEV].speed = MOTO_SPD_LV5;
     //moto_dev.dev_param[MOTO_VDEV].curr_step = -1;
     //moto_dev.dev_param[MOTO_VDEV].default_step = V_MOTO_DEFAULT_STEP;
     moto_dev.dev_param[MOTO_VDEV].is_running = 1;
-    if(moto_dev.dev_param[MOTO_VDEV].curr_step < moto_dev.ins.pos.vpos)
-    {
-        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CW;
-    }
-    else
-    {
-        moto_dev.dev_param[MOTO_VDEV].curr_dir = MOTO_CCW;
-    }
 
     TIMER3_ENABLE;
     MOTO_DRV_LOG("%s exit\n",__func__);
